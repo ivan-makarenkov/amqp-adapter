@@ -119,13 +119,22 @@ _ = q.InitConsumer(ctx)                     // start read loops
 
 `AddConsumer*` is only allowed before `InitConsumer`. Prefetch: QoS = 1 per channel.
 
+`AddConsumerN(N)` creates **N separate AMQP connections and channels** (one client per worker). That gives good parallelism and failure isolation, at the cost of more TCP connections to RabbitMQ compared to a single connection with N goroutines reading one channel.
+
 ## Shutdown
 
 `Shutdown` closes connections first (stops intake), then waits for in-flight handlers (`inflight`) within the context deadline.
 
 ## Options
 
-- `WithLogger` — custom logger (otherwise noop)
+- `WithLogger` — custom logger (otherwise noop); `*slog.Logger` satisfies the interface:
+
+```go
+import "log/slog"
+
+q, err := mq.New(conf, mq.WithLogger(slog.Default()))
+```
+
 - `WithFailHandler` — permanent failures in retry mode
 - `WithPublishHeadersBuilder` — headers from `context` on publish
 - `WithConsumeHeadersExtractor` — restore `context` from headers

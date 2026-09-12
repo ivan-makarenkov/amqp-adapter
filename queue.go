@@ -74,24 +74,30 @@ func newQueueStore(conf Config, opts ...Option) (*queueStore, error) {
 	return store, nil
 }
 
-func newPublisherClient(name QueueName, param QueueItem, conf Config, cfgOpts options) *client {
+func newClient(name QueueName, param QueueItem, conf Config, lgr Logger) *client {
 	return &client{ //nolint:exhaustruct_v5 // connection fields are set on connect
-		queueName:             name,
-		brokerURL:             conf.URL,
-		lgr:                   cfgOpts.lgr,
-		done:                  make(chan struct{}),
-		ready:                 make(chan struct{}),
-		retry:                 param.Retry,
-		ReconnectDelay:        conf.ReconnectDelay,
-		ReInitDelay:           conf.ReInitDelay,
-		ResendDelay:           conf.ResendDelay,
-		PublishHeadersBuilder: cfgOpts.publishHeadersBuilder,
+		queueName:      name,
+		brokerURL:      conf.URL,
+		lgr:            lgr,
+		done:           make(chan struct{}),
+		ready:          make(chan struct{}),
+		retry:          param.Retry,
+		ReconnectDelay: conf.ReconnectDelay,
+		ReInitDelay:    conf.ReInitDelay,
+		ResendDelay:    conf.ResendDelay,
 	}
+}
+
+func newPublisherClient(name QueueName, param QueueItem, conf Config, cfgOpts options) *client {
+	clnt := newClient(name, param, conf, cfgOpts.lgr)
+	clnt.PublishHeadersBuilder = cfgOpts.publishHeadersBuilder
+
+	return clnt
 }
 
 func (queue *queueStore) AddConsumerN(
 	ctx context.Context, name QueueName, parallelism int, callback ConsumerHandler,
-) error {
+) (err error) {
 	if queue.consumersStarted.Load() {
 		return ErrConsumersAlreadyStarted
 	}
@@ -110,13 +116,19 @@ func (queue *queueStore) AddConsumerN(
 
 	var clients []*client
 
-	for range parallelism {
-		clnt, err := queue.addConsumerClient(ctx, name, callback)
+	defer func() {
 		if err != nil {
 			for _, consumer := range clients {
 				_ = consumer.close()
 			}
+		}
+	}()
 
+	for range parallelism {
+		var clnt *client
+
+		clnt, err = queue.addConsumerClient(ctx, name, callback)
+		if err != nil {
 			return err
 		}
 
@@ -126,10 +138,6 @@ func (queue *queueStore) AddConsumerN(
 	queue.mu.Lock()
 	if queue.consumersStarted.Load() {
 		queue.mu.Unlock()
-
-		for _, consumer := range clients {
-			_ = consumer.close()
-		}
 
 		return ErrConsumersAlreadyStarted
 	}
@@ -235,20 +243,10 @@ func (queue *queueStore) addConsumerClient(
 		return nil, fmt.Errorf("%w: %s", ErrQueueNotFound, name)
 	}
 
-	clnt := &client{ //nolint:exhaustruct_v5 // connection fields are set on connect
-		queueName:               name,
-		brokerURL:               queue.config.URL,
-		lgr:                     queue.lgr,
-		done:                    make(chan struct{}),
-		ready:                   make(chan struct{}),
-		retry:                   param.Retry,
-		ReconnectDelay:          queue.config.ReconnectDelay,
-		ReInitDelay:             queue.config.ReInitDelay,
-		ResendDelay:             queue.config.ResendDelay,
-		callback:                callback,
-		consumerDone:            ctx.Done(),
-		ConsumeHeadersExtractor: queue.consumeHeadersExtractor,
-	}
+	clnt := newClient(name, param, queue.config, queue.lgr)
+	clnt.callback = callback
+	clnt.consumerDone = ctx.Done()
+	clnt.ConsumeHeadersExtractor = queue.consumeHeadersExtractor
 
 	go clnt.handleReconnect(queue.config.URL)
 
