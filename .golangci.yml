@@ -1,0 +1,12 @@
+version: 2
+run:
+  tests: false
+  timeout: 5m
+
+linters:
+  default: all
+  disable:
+    - depguard
+    - exhaustruct   # replaced by exhaustruct_v5
+    - gomodguard    # replaced by gomodguard_v2
+    - wsl           # replaced by wsl_v5
