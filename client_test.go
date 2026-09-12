@@ -31,12 +31,12 @@ func TestClient_withRetry(t *testing.T) {
 		want  bool
 	}{
 		{
-			name:  "с retry режимом",
+			name:  "with retry mode",
 			retry: &RetryConfig{Delay: 1 * time.Minute},
 			want:  true,
 		},
 		{
-			name:  "без retry режима",
+			name:  "without retry mode",
 			retry: nil,
 			want:  false,
 		},
@@ -61,27 +61,27 @@ func TestClient_isExpired(t *testing.T) {
 		want        bool
 	}{
 		{
-			name:        "пустая строка считается expired",
+			name:        "empty string is expired",
 			expiredTime: "",
 			want:        true,
 		},
 		{
-			name:        "некорректный формат считается expired",
+			name:        "invalid format is expired",
 			expiredTime: "invalid-format",
 			want:        true,
 		},
 		{
-			name:        "время в прошлом считается expired",
+			name:        "past time is expired",
 			expiredTime: "2000-01-01 00:00:00",
 			want:        true,
 		},
 		{
-			name:        "время в будущем не expired",
+			name:        "future time is not expired",
 			expiredTime: time.Now().Add(1 * time.Hour).Format(time.RFC3339),
 			want:        false,
 		},
 		{
-			name:        "время в прошлом (фиксированное) считается expired",
+			name:        "fixed past time is expired",
 			expiredTime: "2020-01-01 00:00:00",
 			want:        true,
 		},
@@ -98,7 +98,7 @@ func TestClient_isExpired(t *testing.T) {
 }
 
 func TestClient_WaitReady(t *testing.T) {
-	t.Run("успешное ожидание готовности", func(t *testing.T) {
+	t.Run("ready successfully", func(t *testing.T) {
 		clnt := &client{
 			queueName: QueueName("test_queue"),
 			ready:     make(chan struct{}),
@@ -117,7 +117,7 @@ func TestClient_WaitReady(t *testing.T) {
 		}
 	})
 
-	t.Run("отмена контекста", func(t *testing.T) {
+	t.Run("context canceled", func(t *testing.T) {
 		clnt := &client{
 			queueName: QueueName("test_queue"),
 			ready:     make(chan struct{}),
@@ -133,7 +133,7 @@ func TestClient_WaitReady(t *testing.T) {
 		}
 	})
 
-	t.Run("клиент закрыт до готовности", func(t *testing.T) {
+	t.Run("client closed before ready", func(t *testing.T) {
 		clnt := &client{
 			queueName: QueueName("test_queue"),
 			ready:     make(chan struct{}),
@@ -151,7 +151,7 @@ func TestClient_WaitReady(t *testing.T) {
 }
 
 func TestClient_close(t *testing.T) {
-	t.Run("корректное закрытие", func(t *testing.T) {
+	t.Run("successful close", func(t *testing.T) {
 		clnt := &client{
 			queueName: QueueName("test_queue"),
 			done:      make(chan struct{}),
@@ -166,11 +166,11 @@ func TestClient_close(t *testing.T) {
 		select {
 		case <-clnt.done:
 		default:
-			t.Error("done канал не закрыт")
+			t.Error("done channel not closed")
 		}
 	})
 
-	t.Run("идемпотентное закрытие", func(t *testing.T) {
+	t.Run("idempotent close", func(t *testing.T) {
 		clnt := &client{
 			queueName: QueueName("test_queue"),
 			done:      make(chan struct{}),
@@ -231,7 +231,7 @@ func TestClient_push_WaitsForReady(t *testing.T) {
 	time.Sleep(30 * time.Millisecond)
 	select {
 	case err := <-errCh:
-		t.Fatalf("push() вернулся до готовности: %v", err)
+		t.Fatalf("push() returned before ready: %v", err)
 	default:
 	}
 

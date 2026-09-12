@@ -24,8 +24,8 @@ type queueStore struct {
 	inflight                sync.WaitGroup
 }
 
-// New создаёт и инициализирует Queue на основе конфигурации и опций.
-func New(conf Config, opts ...Option) (Queue, error) { //nolint:ireturn // публичный контракт — интерфейс Queue
+// New creates and initializes a Queue from config and options.
+func New(conf Config, opts ...Option) (Queue, error) { //nolint:ireturn // public contract returns Queue interface
 	store, err := newQueueStore(conf, opts...)
 	if err != nil {
 		return nil, err
@@ -49,7 +49,7 @@ func newQueueStore(conf Config, opts ...Option) (*queueStore, error) {
 		conf.QueueParams = make(map[QueueName]QueueItem)
 	}
 
-	store := &queueStore{ //nolint:exhaustruct // mu и consumersStarted инициализируются zero-value
+	store := &queueStore{ //nolint:exhaustruct_v5 // mu, consumersStarted, inflight use zero values
 		config:                  conf,
 		lgr:                     cfgOpts.lgr,
 		failJobHandler:          cfgOpts.failHandler,
@@ -75,7 +75,7 @@ func newQueueStore(conf Config, opts ...Option) (*queueStore, error) {
 }
 
 func newPublisherClient(name QueueName, param QueueItem, conf Config, cfgOpts options) *client {
-	return &client{ //nolint:exhaustruct // остальные поля инициализируются при подключении
+	return &client{ //nolint:exhaustruct_v5 // connection fields are set on connect
 		queueName:             name,
 		brokerURL:             conf.URL,
 		lgr:                   cfgOpts.lgr,
@@ -101,12 +101,12 @@ func (queue *queueStore) AddConsumerN(
 	}
 
 	if parallelism <= 0 {
-		queue.lgr.WrnCtx(ctx, "parallelism <= 0 для очереди "+string(name)+", используется 1")
+		queue.lgr.WarnContext(ctx, "parallelism <= 0 for queue "+string(name)+", using 1")
 
 		parallelism = 1
 	}
 
-	queue.lgr.InfCtx(ctx, "добавление "+strconv.Itoa(parallelism)+" обработчиков для очереди "+string(name))
+	queue.lgr.InfoContext(ctx, "adding "+strconv.Itoa(parallelism)+" handlers for queue "+string(name))
 
 	var clients []*client
 
@@ -192,7 +192,7 @@ func (queue *queueStore) InitConsumer(ctx context.Context) error {
 func (queue *queueStore) Shutdown(ctx context.Context) error {
 	publishers, consumers := queue.snapshotClients()
 
-	// Сначала останавливаем приём новых сообщений, затем ждём уже запущенные обработки.
+	// Stop accepting new messages first, then wait for in-flight handlers.
 	firstErr := queue.closeClients(ctx, publishers, consumers)
 
 	waitErr := queue.waitInflight(ctx)
@@ -223,7 +223,7 @@ func (queue *queueStore) waitInflight(ctx context.Context) error {
 	case <-done:
 		return nil
 	case <-ctx.Done():
-		return fmt.Errorf("таймаут ожидания завершения обработки сообщений: %w", ctx.Err())
+		return fmt.Errorf("timeout waiting for in-flight message processing: %w", ctx.Err())
 	}
 }
 
@@ -235,7 +235,7 @@ func (queue *queueStore) addConsumerClient(
 		return nil, fmt.Errorf("%w: %s", ErrQueueNotFound, name)
 	}
 
-	clnt := &client{ //nolint:exhaustruct // поля соединения заполняются при подключении
+	clnt := &client{ //nolint:exhaustruct_v5 // connection fields are set on connect
 		queueName:               name,
 		brokerURL:               queue.config.URL,
 		lgr:                     queue.lgr,
@@ -340,11 +340,11 @@ func (queue *queueStore) closeOneClient(
 
 	err := clnt.close()
 	if err != nil && firstErr == nil {
-		return fmt.Errorf("ошибка при закрытии %s %s[%d]: %w", role, name, idx, err)
+		return fmt.Errorf("error closing %s %s[%d]: %w", role, name, idx, err)
 	}
 
 	if err != nil && firstErr != nil {
-		queue.lgr.Wrn("ошибка при закрытии "+role+" "+string(name), err)
+		queue.lgr.Warn("error closing "+role+" "+string(name), err)
 	}
 
 	return firstErr

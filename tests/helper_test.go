@@ -38,12 +38,12 @@ func requireFunctional(t *testing.T) {
 	t.Helper()
 
 	if testing.Short() {
-		t.Skip("пропуск функционального теста в short режиме")
+		t.Skip("skipping functional test in short mode")
 	}
 
 	conn, err := amqp.Dial(rabbitURL())
 	if err != nil {
-		t.Fatalf("RabbitMQ недоступен (%s): %v", rabbitURL(), err)
+		t.Fatalf("RabbitMQ unavailable (%s): %v", rabbitURL(), err)
 	}
 
 	_ = conn.Close()
@@ -53,7 +53,7 @@ func requireDocker(t *testing.T) {
 	t.Helper()
 
 	if _, err := exec.LookPath("docker"); err != nil {
-		t.Skip("docker не найден в PATH")
+		t.Skip("docker not found in PATH")
 	}
 }
 
@@ -77,7 +77,7 @@ func waitUntil(t *testing.T, timeout time.Duration, cond func() bool, msg string
 		time.Sleep(50 * time.Millisecond)
 	}
 
-	t.Fatalf("таймаут ожидания: %s", msg)
+	t.Fatalf("wait timeout: %s", msg)
 }
 
 func waitRabbitReady(t *testing.T, timeout time.Duration) {
@@ -92,23 +92,21 @@ func waitRabbitReady(t *testing.T, timeout time.Duration) {
 		_ = conn.Close()
 
 		return true
-	}, "готовность RabbitMQ")
+	}, "RabbitMQ readiness")
 }
 
 type tLogger struct {
 	t *testing.T
 }
 
-func (l tLogger) Inf(msg string, args ...any)                       { l.t.Logf("INF: "+msg, args...) }
-func (l tLogger) Wrn(msg string, args ...any)                       { l.t.Logf("WRN: "+msg, args...) }
-func (l tLogger) Dbg(msg string, args ...any)                       { l.t.Logf("DBG: "+msg, args...) }
-func (l tLogger) Err(msg string, args ...any)                       { l.t.Logf("ERR: "+msg, args...) }
-func (l tLogger) Ftl(msg string, args ...any)                       { l.t.Logf("FTL: "+msg, args...) }
-func (l tLogger) InfCtx(_ context.Context, msg string, args ...any) { l.Inf(msg, args...) }
-func (l tLogger) WrnCtx(_ context.Context, msg string, args ...any) { l.Wrn(msg, args...) }
-func (l tLogger) DbgCtx(_ context.Context, msg string, args ...any) { l.Dbg(msg, args...) }
-func (l tLogger) ErrCtx(_ context.Context, msg string, args ...any) { l.Err(msg, args...) }
-func (l tLogger) FtlCtx(_ context.Context, msg string, args ...any) { l.Ftl(msg, args...) }
+func (l tLogger) Info(msg string, args ...any)                                 { l.t.Logf("INFO: "+msg, args...) }
+func (l tLogger) Warn(msg string, args ...any)                                 { l.t.Logf("WARN: "+msg, args...) }
+func (l tLogger) Debug(msg string, args ...any)                                { l.t.Logf("DEBUG: "+msg, args...) }
+func (l tLogger) Error(msg string, args ...any)                                { l.t.Logf("ERROR: "+msg, args...) }
+func (l tLogger) InfoContext(_ context.Context, msg string, args ...any)       { l.Info(msg, args...) }
+func (l tLogger) WarnContext(_ context.Context, msg string, args ...any)       { l.Warn(msg, args...) }
+func (l tLogger) DebugContext(_ context.Context, msg string, args ...any)      { l.Debug(msg, args...) }
+func (l tLogger) ErrorContext(_ context.Context, msg string, args ...any)      { l.Error(msg, args...) }
 
 type testQueueOptions struct {
 	failHandler mq.FailJobHandler
@@ -172,10 +170,10 @@ func publishUntilSuccess(t *testing.T, ctx context.Context, queue mq.Queue, name
 	waitUntil(t, timeout, func() bool {
 		lastErr = queue.Publish(ctx, name, msg)
 		return lastErr == nil
-	}, "успешная публикация")
+	}, "successful publish")
 
 	if lastErr != nil {
-		t.Fatalf("Publish() не удалась: %v", lastErr)
+		t.Fatalf("Publish() failed: %v", lastErr)
 	}
 }
 

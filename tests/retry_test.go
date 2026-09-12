@@ -35,10 +35,10 @@ func TestRetry_MessageRetriedUntilSuccess(t *testing.T) {
 
 	err := queue.AddConsumer(ctx, queueName, func(_ context.Context, data []byte) error {
 		attempt := attempts.Add(1)
-		t.Logf("попытка обработки #%d, body=%q", attempt, data)
+		t.Logf("processing attempt #%d, body=%q", attempt, data)
 
 		if attempt < wantSuccessOnAttempt {
-			return mq.Retry(errors.New("временная ошибка"))
+			return mq.Retry(errors.New("temporary error"))
 		}
 
 		succeeded.Store(true)
@@ -56,13 +56,13 @@ func TestRetry_MessageRetriedUntilSuccess(t *testing.T) {
 
 	publishUntilSuccess(t, ctx, queue, queueName, mq.PublishMessage{Body: []byte("retry-me")}, 15*time.Second)
 
-	// Две задержки retry + запас на обработку.
+	// Two retry delays plus processing slack.
 	waitUntil(t, retryDelay*time.Duration(wantSuccessOnAttempt)+10*time.Second, func() bool {
 		return succeeded.Load()
-	}, "успешная обработка после retry")
+	}, "successful processing after retry")
 
 	if got := attempts.Load(); got < wantSuccessOnAttempt {
-		t.Fatalf("попыток обработки %d, want >= %d", got, wantSuccessOnAttempt)
+		t.Fatalf("processing attempts %d, want >= %d", got, wantSuccessOnAttempt)
 	}
 }
 
@@ -94,8 +94,8 @@ func TestRetry_PermanentErrorCallsFailHandler(t *testing.T) {
 	defer cancel()
 
 	err := queue.AddConsumer(ctx, queueName, func(_ context.Context, _ []byte) error {
-		// Неповторяемая ошибка — сразу в fail handler.
-		return errors.New("неисправимая ошибка")
+		// Non-retryable error — go straight to fail handler.
+		return errors.New("permanent error")
 	})
 	if err != nil {
 		t.Fatalf("AddConsumer() error = %v", err)
@@ -110,10 +110,10 @@ func TestRetry_PermanentErrorCallsFailHandler(t *testing.T) {
 
 	waitUntil(t, 10*time.Second, func() bool {
 		return failedJobs.Load() >= 1
-	}, "вызов fail handler при неповторяемой ошибке")
+	}, "fail handler called for non-retryable error")
 
 	if got := failedJobs.Load(); got < 1 {
-		t.Fatalf("fail handler вызван %d раз, want >= 1", got)
+		t.Fatalf("fail handler called %d times, want >= 1", got)
 	}
 }
 
@@ -145,7 +145,7 @@ func TestRetry_ExhaustedCallsFailHandler(t *testing.T) {
 	defer cancel()
 
 	err := queue.AddConsumer(ctx, queueName, func(_ context.Context, _ []byte) error {
-		return mq.Retry(errors.New("постоянная ошибка"))
+		return mq.Retry(errors.New("persistent error"))
 	})
 	if err != nil {
 		t.Fatalf("AddConsumer() error = %v", err)
@@ -162,12 +162,12 @@ func TestRetry_ExhaustedCallsFailHandler(t *testing.T) {
 		MaxRetryDuration: &maxRetry,
 	}, 15*time.Second)
 
-	// Ждём истечения MaxRetryDuration + несколько циклов delay-очереди.
+	// Wait for MaxRetryDuration plus a few delay-queue cycles.
 	waitUntil(t, 20*time.Second, func() bool {
 		return failedJobs.Load() >= 1
-	}, "вызов fail handler после исчерпания retry")
+	}, "fail handler called after retries exhausted")
 
 	if got := failedJobs.Load(); got < 1 {
-		t.Fatalf("fail handler вызван %d раз, want >= 1", got)
+		t.Fatalf("fail handler called %d times, want >= 1", got)
 	}
 }

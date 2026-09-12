@@ -5,24 +5,24 @@ import (
 	"fmt"
 )
 
-// RetryableError оборачивает ошибку, сигнализируя consumer loop о необходимости повторной обработки.
+// RetryableError wraps an error to signal that the consumer loop should retry.
 type RetryableError struct {
 	Err error
 }
 
 func (e *RetryableError) Error() string {
 	if e.Err == nil {
-		return "повторяемая ошибка обработки сообщения"
+		return "retryable message processing error"
 	}
 
-	return fmt.Sprintf("повторяемая ошибка обработки сообщения: %v", e.Err)
+	return fmt.Sprintf("retryable message processing error: %v", e.Err)
 }
 
 func (e *RetryableError) Unwrap() error {
 	return e.Err
 }
 
-// Retry оборачивает ошибку как повторяемую для ConsumerHandler.
+// Retry wraps err as retryable for ConsumerHandler.
 func Retry(err error) error {
 	if err == nil {
 		return nil
@@ -31,7 +31,7 @@ func Retry(err error) error {
 	return &RetryableError{Err: err}
 }
 
-// IsRetryable проверяет, помечена ли ошибка как повторяемая.
+// IsRetryable reports whether err is marked as retryable.
 func IsRetryable(err error) bool {
 	var re *RetryableError
 

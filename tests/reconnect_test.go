@@ -17,7 +17,7 @@ func TestReconnect_AfterRabbitMQRestart(t *testing.T) {
 	queue := newTestQueue(t, map[mq.QueueName]mq.QueueItem{
 		queueName: {},
 	}, testQueueOptions{
-		// failHandler не нужен — retry выключен
+		// failHandler not needed — retry disabled
 	})
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -26,7 +26,7 @@ func TestReconnect_AfterRabbitMQRestart(t *testing.T) {
 	var processed atomic.Int64
 
 	err := queue.AddConsumer(ctx, queueName, func(_ context.Context, data []byte) error {
-		t.Logf("получено сообщение: %q", data)
+		t.Logf("received message: %q", data)
 		processed.Add(1)
 
 		return nil
@@ -40,33 +40,33 @@ func TestReconnect_AfterRabbitMQRestart(t *testing.T) {
 		t.Fatalf("InitConsumer() error = %v", err)
 	}
 
-	// Сообщение до остановки RabbitMQ.
+	// Message before stopping RabbitMQ.
 	publishUntilSuccess(t, ctx, queue, queueName, mq.PublishMessage{Body: []byte("before-stop")}, 20*time.Second)
 
 	waitUntil(t, 15*time.Second, func() bool {
 		return processed.Load() >= 1
-	}, "обработка сообщения до остановки RabbitMQ")
+	}, "message processed before RabbitMQ stop")
 
-	t.Log("остановка RabbitMQ...")
+	t.Log("stopping RabbitMQ...")
 	runCompose(t, "stop", "rabbitmq")
 
 	time.Sleep(2 * time.Second)
 
-	t.Log("запуск RabbitMQ...")
+	t.Log("starting RabbitMQ...")
 	runCompose(t, "start", "rabbitmq")
 	waitRabbitReady(t, 90*time.Second)
 
-	// Даём клиенту время на переподключение.
+	// Give the client time to reconnect.
 	time.Sleep(3 * time.Second)
 
-	// Сообщение после восстановления RabbitMQ.
+	// Message after RabbitMQ recovery.
 	publishUntilSuccess(t, ctx, queue, queueName, mq.PublishMessage{Body: []byte("after-start")}, 60*time.Second)
 
 	waitUntil(t, 60*time.Second, func() bool {
 		return processed.Load() >= 2
-	}, "обработка сообщения после переподключения")
+	}, "message processed after reconnect")
 
 	if got := processed.Load(); got < 2 {
-		t.Fatalf("обработано %d сообщений, want >= 2", got)
+		t.Fatalf("processed %d messages, want >= 2", got)
 	}
 }

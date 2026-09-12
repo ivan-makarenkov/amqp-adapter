@@ -33,7 +33,7 @@ consumerLoop:
 
 		deliveries, err := clnt.consume()
 		if err != nil {
-			queue.lgr.Wrn("ошибка во время чтения очереди "+string(clnt.queueName)+", повторная попытка", err)
+			queue.lgr.Warn("error consuming queue "+string(clnt.queueName)+", retrying", err)
 
 			backoffDelay = queue.sleepConsumerBackoff(done, clnt.done, backoffDelay)
 			if backoffDelay == 0 {
@@ -123,7 +123,7 @@ func (queue *queueStore) processDeliveries(
 
 		case delivery, ok := <-deliveries:
 			if !ok {
-				queue.lgr.Wrn("канал доставки для очереди " + string(clnt.queueName) + " закрыт, переподписка")
+				queue.lgr.Warn("delivery channel for queue " + string(clnt.queueName) + " closed, resubscribing")
 
 				return true
 			}
@@ -135,13 +135,13 @@ func (queue *queueStore) processDeliveries(
 
 func (queue *queueStore) logChannelClosed(name QueueName, amqErr *amqp.Error) {
 	if amqErr != nil {
-		queue.lgr.Wrn(
-			"канал для очереди "+string(name)+" был закрыт",
+		queue.lgr.Warn(
+			"channel for queue "+string(name)+" was closed",
 			amqErr,
 		)
 
 		return
 	}
 
-	queue.lgr.Wrn("канал для очереди " + string(name) + " был закрыт")
+	queue.lgr.Warn("channel for queue " + string(name) + " was closed")
 }

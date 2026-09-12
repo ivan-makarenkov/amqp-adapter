@@ -30,7 +30,7 @@ rabbitmq-down: ## Stop RabbitMQ test container
 	@docker rm mq-rabbitmq-test 2>/dev/null || true
 
 .PHONY: test-functional
-test-functional: ## Поднять RabbitMQ (docker compose) и запустить функциональные тесты
+test-functional: ## Start RabbitMQ (docker compose) and run functional tests
 	@set -e; \
 	COMPOSE_STARTED=0; \
 	if ! docker compose -f tests/docker-compose.yml ps --status running 2>/dev/null | grep -q rabbitmq; then \
@@ -41,11 +41,11 @@ test-functional: ## Поднять RabbitMQ (docker compose) и запустит
 	MQ_TEST_SKIP_COMPOSE=1 go test -C tests -v -count=1 -p 1 ./...
 
 .PHONY: test-functional-down
-test-functional-down: ## Остановить RabbitMQ из tests/docker-compose.yml
+test-functional-down: ## Stop RabbitMQ from tests/docker-compose.yml
 	docker compose -f tests/docker-compose.yml down -v
 
 .PHONY: test-integration
-test-integration: test-functional ## alias: функциональные тесты с RabbitMQ
+test-integration: test-functional ## alias: functional tests with RabbitMQ
 
 .PHONY: lint-install
 lint-install:

@@ -23,7 +23,7 @@ func TestAddConsumerN_NormalizesParallelism(t *testing.T) {
 		return nil
 	})
 
-	wrn := lgr.GetWrnMessages()
+	wrn := lgr.GetWarnMessages()
 	found := false
 	for _, m := range wrn {
 		if strings.Contains(m, "parallelism") {
@@ -32,7 +32,7 @@ func TestAddConsumerN_NormalizesParallelism(t *testing.T) {
 		}
 	}
 	if !found {
-		t.Error("AddConsumerN(0) должен залогировать предупреждение о нормализации parallelism")
+		t.Error("AddConsumerN(0) should log a parallelism normalization warning")
 	}
 }
 
@@ -106,7 +106,7 @@ func TestShutdown_ClosesClientsBeforeWaitingInflight(t *testing.T) {
 		}
 	}
 
-	t.Fatal("клиент не был закрыт до завершения ожидания inflight")
+	t.Fatal("client was not closed before inflight wait finished")
 }
 
 func TestShutdown_ClosesAllConsumerWorkers(t *testing.T) {
@@ -126,7 +126,7 @@ func TestShutdown_ClosesAllConsumerWorkers(t *testing.T) {
 
 	err = queue.Shutdown(context.Background())
 	if err != nil {
-		t.Logf("Shutdown() вернул ошибку (ожидаемо при отсутствии RabbitMQ): %v", err)
+		t.Logf("Shutdown() returned error (expected without RabbitMQ): %v", err)
 	}
 }
 
@@ -215,7 +215,7 @@ func TestAddConsumer_DoesNotBlockWithoutRabbitMQ(t *testing.T) {
 	}
 
 	if elapsed > 30*time.Millisecond {
-		t.Errorf("AddConsumer() заблокировался на %v, ожидалась мгновенная регистрация", elapsed)
+		t.Errorf("AddConsumer() blocked for %v, expected instant registration", elapsed)
 	}
 
 	_ = queue.Shutdown(context.Background())
@@ -223,7 +223,7 @@ func TestAddConsumer_DoesNotBlockWithoutRabbitMQ(t *testing.T) {
 
 func TestAddConsumer_AfterInitConsumer_ReturnsError(t *testing.T) {
 	if testing.Short() {
-		t.Skip("пропуск теста в коротком режиме")
+		t.Skip("skipping in short mode")
 	}
 
 	conn := requireRabbitMQ(t)
@@ -262,7 +262,7 @@ func TestAddConsumer_AfterInitConsumer_ReturnsError(t *testing.T) {
 
 func TestAddConsumerN_CompetingConsumers_Integration(t *testing.T) {
 	if testing.Short() {
-		t.Skip("пропуск интеграционного теста в коротком режиме")
+		t.Skip("skipping integration test in short mode")
 	}
 
 	conn := requireRabbitMQ(t)
@@ -317,7 +317,7 @@ func TestAddConsumerN_CompetingConsumers_Integration(t *testing.T) {
 
 	got := processed.Load()
 	if got != 10 {
-		t.Errorf("обработано %d сообщений, ожидалось 10", got)
+		t.Errorf("processed %d messages, want 10", got)
 	}
 
 	cancel()

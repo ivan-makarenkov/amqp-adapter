@@ -17,7 +17,7 @@ func TestMain(m *testing.M) {
 
 	if !rabbitAvailable() {
 		if err := composeUp(); err != nil {
-			fmt.Fprintf(os.Stderr, "не удалось поднять RabbitMQ через docker compose: %v\n", err)
+			fmt.Fprintf(os.Stderr, "failed to start RabbitMQ via docker compose: %v\n", err)
 			os.Exit(1)
 		}
 

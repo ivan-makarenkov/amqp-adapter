@@ -6,14 +6,14 @@ import (
 	"time"
 )
 
-// FailedJob описывает задачу, не обработанную после исчерпания retry.
+// FailedJob describes a job that failed after retries were exhausted.
 type FailedJob struct {
 	Queue QueueName
 	Body  []byte
 	Err   error
 }
 
-// FailJobHandler вызывается при окончательном сбое обработки сообщения в retry-режиме.
+// FailJobHandler is called on permanent failure in retry mode.
 type FailJobHandler func(job FailedJob) error
 
 type options struct {
@@ -23,10 +23,10 @@ type options struct {
 	consumeHeadersExtractor ConsumeHeadersExtractor
 }
 
-// Option настраивает Queue при создании через New.
+// Option configures Queue at New time.
 type Option func(*options)
 
-// WithLogger задаёт логгер; по умолчанию используется noop-логгер.
+// WithLogger sets the logger; the default is a noop logger.
 func WithLogger(lgr Logger) Option {
 	return func(o *options) {
 		if lgr != nil {
@@ -35,14 +35,14 @@ func WithLogger(lgr Logger) Option {
 	}
 }
 
-// WithFailHandler задаёт обработчик окончательно проваленных задач (обязателен при Retry в QueueItem).
+// WithFailHandler sets the permanent-failure handler (required when QueueItem.Retry is set).
 func WithFailHandler(h FailJobHandler) Option {
 	return func(o *options) {
 		o.failHandler = h
 	}
 }
 
-// WithPublishHeadersBuilder задаёт функцию формирования AMQP headers при публикации.
+// WithPublishHeadersBuilder sets the function that builds AMQP headers on publish.
 func WithPublishHeadersBuilder(b PublishHeadersBuilder) Option {
 	return func(o *options) {
 		if b != nil {
@@ -51,7 +51,7 @@ func WithPublishHeadersBuilder(b PublishHeadersBuilder) Option {
 	}
 }
 
-// WithConsumeHeadersExtractor задаёт функцию извлечения context из AMQP headers при потреблении.
+// WithConsumeHeadersExtractor sets the function that restores context from AMQP headers on consume.
 func WithConsumeHeadersExtractor(e ConsumeHeadersExtractor) Option {
 	return func(o *options) {
 		if e != nil {

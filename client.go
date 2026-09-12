@@ -43,11 +43,11 @@ type client struct {
 	ConsumeHeadersExtractor ConsumeHeadersExtractor
 }
 
-// WaitReady ждёт готовности клиента или отмены контекста.
+// WaitReady waits until the client is ready or the context is canceled.
 func (clnt *client) WaitReady(ctx context.Context) error {
 	select {
 	case <-ctx.Done():
-		return fmt.Errorf("контекст отменён при ожидании готовности клиента %s: %w", clnt.queueName, ctx.Err())
+		return fmt.Errorf("context canceled while waiting for client %s readiness: %w", clnt.queueName, ctx.Err())
 	case <-clnt.done:
 		return fmt.Errorf("%w %s", ErrClientClosedBeforeReady, clnt.queueName)
 	case <-clnt.ready:
@@ -56,16 +56,16 @@ func (clnt *client) WaitReady(ctx context.Context) error {
 }
 
 func (clnt *client) handleReconnect(addr string) {
-	clnt.lgr.Inf("начало попытки соединения с очередью " + string(clnt.queueName))
+	clnt.lgr.Info("starting connection attempts for queue " + string(clnt.queueName))
 
 	for {
 		clnt.isReady.Store(0)
 
-		clnt.lgr.Inf("попытка соединения с очередью " + string(clnt.queueName))
+		clnt.lgr.Info("attempting connection for queue " + string(clnt.queueName))
 
 		conn, err := clnt.connect(addr)
 		if err != nil {
-			clnt.lgr.Inf("неудачная попытка соединения с очередью " + string(clnt.queueName) + ", повторная попытка...")
+			clnt.lgr.Info("failed to connect to queue " + string(clnt.queueName) + ", retrying...")
 
 			if clnt.waitOrDone(clnt.ReconnectDelay) {
 				return
@@ -99,26 +99,26 @@ func (clnt *client) connect(addr string) (*amqp.Connection, error) {
 	clnt.notifyConnClose = make(chan *amqp.Error, 1)
 	clnt.conn.NotifyClose(clnt.notifyConnClose)
 
-	clnt.lgr.Inf("соединение с очередью " + string(clnt.queueName) + " прошло успешно")
+	clnt.lgr.Info("connected to queue " + string(clnt.queueName))
 
 	return conn, nil
 }
 
 func (clnt *client) handleReInit(conn *amqp.Connection) bool {
-	clnt.lgr.Inf("начало попытки инициализировать канал для очереди " + string(clnt.queueName))
+	clnt.lgr.Info("starting channel init for queue " + string(clnt.queueName))
 
 	for {
 		clnt.isReady.Store(0)
 
 		err := clnt.init(conn)
 		if err != nil {
-			clnt.lgr.Err("не удалось инициализировать канал для " + string(clnt.queueName) + ", повторная попытка...")
+			clnt.lgr.Error("failed to init channel for " + string(clnt.queueName) + ", retrying...")
 
 			select {
 			case <-clnt.done:
 				return true
 			case <-clnt.notifyConnClose:
-				clnt.lgr.Inf("соединение clnt " + string(clnt.queueName) + " разорвано, переподключение...")
+				clnt.lgr.Info("connection for " + string(clnt.queueName) + " closed, reconnecting...")
 
 				return false
 			case <-time.After(clnt.ReInitDelay):
@@ -131,17 +131,17 @@ func (clnt *client) handleReInit(conn *amqp.Connection) bool {
 		case <-clnt.done:
 			return true
 		case <-clnt.notifyConnClose:
-			clnt.lgr.Inf("удачное соединение clnt " + string(clnt.queueName) + " разорвано, переподключение...")
+			clnt.lgr.Info("established connection for " + string(clnt.queueName) + " closed, reconnecting...")
 
 			return false
 		case <-clnt.notifyChanClose:
-			clnt.lgr.Inf("канал для " + string(clnt.queueName) + " закрыт, повторный запуск инициализации...")
+			clnt.lgr.Info("channel for " + string(clnt.queueName) + " closed, re-initializing...")
 		}
 	}
 }
 
 func (clnt *client) init(conn *amqp.Connection) error {
-	clnt.lgr.Inf("начало попытки инициализировать очередь " + string(clnt.queueName))
+	clnt.lgr.Info("starting queue init for " + string(clnt.queueName))
 
 	channel, err := conn.Channel()
 	if err != nil {
@@ -174,7 +174,7 @@ func (clnt *client) init(conn *amqp.Connection) error {
 	}
 
 	if err != nil {
-		clnt.lgr.Wrn("ошибка при инициализации очереди", err)
+		clnt.lgr.Warn("queue init error", err)
 		_ = clnt.ch.Close()
 		clnt.ch = nil
 
@@ -189,20 +189,20 @@ func (clnt *client) init(conn *amqp.Connection) error {
 		close(clnt.ready)
 	}
 
-	clnt.lgr.Inf("инициализация клиента очереди " + string(clnt.queueName) + " завершена")
+	clnt.lgr.Info("queue client init completed for " + string(clnt.queueName))
 
 	return nil
 }
 
 func (clnt *client) logReturnedMessages(notifyReturn <-chan amqp.Return) {
 	for ret := range notifyReturn {
-		clnt.lgr.Err(
-			"сообщение возвращено брокером (недоступна очередь/маршрутизация): "+
-				"очередь="+string(clnt.queueName)+
-				", replyCode="+strconv.Itoa(int(ret.ReplyCode))+
-				", replyText="+ret.ReplyText+
-				", exchange="+ret.Exchange+
-				", routingKey="+ret.RoutingKey,
+		clnt.lgr.Error(
+			"message returned by broker (queue/routing unavailable): " +
+				"queue=" + string(clnt.queueName) +
+				", replyCode=" + strconv.Itoa(int(ret.ReplyCode)) +
+				", replyText=" + ret.ReplyText +
+				", exchange=" + ret.Exchange +
+				", routingKey=" + ret.RoutingKey,
 		)
 	}
 }
@@ -229,7 +229,7 @@ func (clnt *client) push(ctx context.Context, msg PublishMessage) error {
 			return nil
 		}
 
-		clnt.lgr.ErrCtx(ctx, "отправка сообщения в очередь "+string(clnt.queueName)+" не удалась, повторная попытка")
+		clnt.lgr.ErrorContext(ctx, "failed to publish to queue "+string(clnt.queueName)+", retrying")
 
 		waitErr := clnt.waitBeforePushRetry(ctx)
 		if waitErr != nil {
@@ -258,7 +258,7 @@ func (clnt *client) waitPublishConfirm(ctx context.Context) error {
 	case confirm := <-clnt.notifyConfirm:
 		if confirm.Ack {
 			deliveryTag := strconv.FormatUint(confirm.DeliveryTag, 10)
-			clnt.lgr.InfCtx(ctx, "сообщение отправлено в очередь "+string(clnt.queueName)+", deliveryTag="+deliveryTag)
+			clnt.lgr.InfoContext(ctx, "message published to queue "+string(clnt.queueName)+", deliveryTag="+deliveryTag)
 
 			return nil
 		}
@@ -280,7 +280,7 @@ func (clnt *client) unsafePush(ctx context.Context, msg PublishMessage, contextH
 		contentType = DefaultContentType
 	}
 
-	pub := amqp.Publishing{ //nolint:exhaustruct // заполняются только используемые поля AMQP
+	pub := amqp.Publishing{ //nolint:exhaustruct_v5 // only used AMQP fields are set
 		DeliveryMode: amqp.Persistent,
 		ContentType:  contentType,
 		Body:         msg.Body,
@@ -378,13 +378,13 @@ func parseExpiredTime(expiredTime string) (time.Time, error) {
 
 	parsed, err = time.ParseInLocation(dateFormatLegacy, expiredTime, time.UTC)
 	if err != nil {
-		return time.Time{}, fmt.Errorf("ошибка разбора legacy expired %q: %w", expiredTime, err)
+		return time.Time{}, fmt.Errorf("failed to parse legacy expired %q: %w", expiredTime, err)
 	}
 
 	return parsed, nil
 }
 
-// ensureConnected запускает reconnect-цикл при первом обращении (lazy publisher).
+// ensureConnected starts the reconnect loop on first use (lazy publisher).
 func (clnt *client) ensureConnected() {
 	clnt.startOnce.Do(func() {
 		go clnt.handleReconnect(clnt.brokerURL)
@@ -395,7 +395,7 @@ func (clnt *client) close() error {
 	var closeErr error
 
 	clnt.closeOnce.Do(func() {
-		clnt.lgr.Inf("закрытие соединения mq")
+		clnt.lgr.Info("closing mq connection")
 
 		clnt.isReady.Store(0)
 
@@ -426,12 +426,12 @@ func (clnt *client) close() error {
 func initQueue(name string, channel *amqp.Channel) (amqp.Queue, error) {
 	queue, err := channel.QueueDeclare(name, true, false, false, false, nil)
 	if err != nil {
-		return amqp.Queue{}, fmt.Errorf("ошибка при объявлении очереди %s: %w", name, err)
+		return amqp.Queue{}, fmt.Errorf("error declaring queue %s: %w", name, err)
 	}
 
 	err = channel.Qos(1, 0, false)
 	if err != nil {
-		return amqp.Queue{}, fmt.Errorf("ошибка при объявлении Qos для очереди %s: %w", name, err)
+		return amqp.Queue{}, fmt.Errorf("error setting QoS for queue %s: %w", name, err)
 	}
 
 	return queue, nil
@@ -440,19 +440,19 @@ func initQueue(name string, channel *amqp.Channel) (amqp.Queue, error) {
 func initQueueWithRetry(name string, channel *amqp.Channel, retryDelay time.Duration) (amqp.Queue, error) {
 	err := channel.ExchangeDeclare(name+".ex", "fanout", true, false, false, false, nil)
 	if err != nil {
-		return amqp.Queue{}, fmt.Errorf("ошибка при объявлении обменника очереди: %w", err)
+		return amqp.Queue{}, fmt.Errorf("error declaring queue exchange: %w", err)
 	}
 
 	err = channel.ExchangeDeclare(name+".delay.ex", "fanout", true, false, false, false, nil)
 	if err != nil {
-		return amqp.Queue{}, fmt.Errorf("ошибка при объявлении обменника очереди: %w", err)
+		return amqp.Queue{}, fmt.Errorf("error declaring delay exchange: %w", err)
 	}
 
 	queue, err := channel.QueueDeclare(name, true, false, false, false, amqp.Table{
 		"x-dead-letter-exchange": name + ".delay.ex",
 	})
 	if err != nil {
-		return amqp.Queue{}, fmt.Errorf("ошибка при объявлении очереди %s: %w", name, err)
+		return amqp.Queue{}, fmt.Errorf("error declaring queue %s: %w", name, err)
 	}
 
 	_, err = channel.QueueDeclare(name+".delay", true, false, false, false, amqp.Table{
@@ -460,22 +460,22 @@ func initQueueWithRetry(name string, channel *amqp.Channel, retryDelay time.Dura
 		"x-message-ttl":          int64(retryDelay / time.Millisecond),
 	})
 	if err != nil {
-		return amqp.Queue{}, fmt.Errorf("ошибка при объявлении очереди %s.delay: %w", name, err)
+		return amqp.Queue{}, fmt.Errorf("error declaring queue %s.delay: %w", name, err)
 	}
 
 	err = channel.QueueBind(name, name+".bind", name+".ex", false, nil)
 	if err != nil {
-		return amqp.Queue{}, fmt.Errorf("%w (для: %q): %w", ErrBindQueueToExchange, name+".ex", err)
+		return amqp.Queue{}, fmt.Errorf("%w (for: %q): %w", ErrBindQueueToExchange, name+".ex", err)
 	}
 
 	err = channel.QueueBind(name+".delay", name+".delay.bind", name+".delay.ex", false, nil)
 	if err != nil {
-		return amqp.Queue{}, fmt.Errorf("%w (для: %q): %w", ErrBindQueueToExchange, name+".delay.ex", err)
+		return amqp.Queue{}, fmt.Errorf("%w (for: %q): %w", ErrBindQueueToExchange, name+".delay.ex", err)
 	}
 
 	err = channel.Qos(1, 0, false)
 	if err != nil {
-		return amqp.Queue{}, fmt.Errorf("ошибка при объявлении Qos для очереди %s: %w", name, err)
+		return amqp.Queue{}, fmt.Errorf("error setting QoS for queue %s: %w", name, err)
 	}
 
 	return queue, nil

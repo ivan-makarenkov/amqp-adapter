@@ -45,8 +45,8 @@ func (queue *queueStore) invokeHandler(
 			if recovered := recover(); recovered != nil {
 				panicked = true
 
-				queue.lgr.Err(
-					"panic при обработке сообщения в очереди "+string(clnt.queueName),
+				queue.lgr.Error(
+					"panic while processing message in queue "+string(clnt.queueName),
 					recovered,
 				)
 			}
@@ -61,8 +61,8 @@ func (queue *queueStore) invokeHandler(
 func nackAfterPanic(queue *queueStore, clnt *client, delivery amqp.Delivery) {
 	err := delivery.Nack(false, false)
 	if err != nil {
-		queue.lgr.Wrn(
-			"ошибка при nack после panic в очереди "+string(clnt.queueName),
+		queue.lgr.Warn(
+			"error nacking after panic in queue "+string(clnt.queueName),
 			err,
 		)
 	}
@@ -82,9 +82,9 @@ func extractExpiredHeader(queue *queueStore, clnt *client, delivery amqp.Deliver
 		return v
 	}
 
-	queue.lgr.Wrn(
-		"в заголовке сообщения отсутствует или некорректен expired для очереди " +
-			string(clnt.queueName) + ", считаем expired",
+	queue.lgr.Warn(
+		"missing or invalid expired header for queue " +
+			string(clnt.queueName) + ", treating as expired",
 	)
 
 	return ""
@@ -122,13 +122,13 @@ func (queue *queueStore) finalizeFailedRetry(
 ) {
 	switch {
 	case !retryable:
-		queue.lgr.Inf(
-			"неповторяемая ошибка обработки для очереди "+string(clnt.queueName),
+		queue.lgr.Info(
+			"non-retryable processing error for queue "+string(clnt.queueName),
 			cErr,
 		)
 	case isExpired:
-		queue.lgr.Inf(
-			"истекло время retry для очереди "+string(clnt.queueName)+
+		queue.lgr.Info(
+			"retry deadline expired for queue "+string(clnt.queueName)+
 				", expired="+fmt.Sprint(delivery.Headers["expired"]),
 		)
 	}
@@ -140,8 +140,8 @@ func (queue *queueStore) finalizeFailedRetry(
 			Err:   cErr,
 		})
 		if err != nil {
-			queue.lgr.Wrn(
-				"ошибка при обработке неудачно завершённой задачи в очереди "+string(clnt.queueName),
+			queue.lgr.Warn(
+				"error in fail handler for queue "+string(clnt.queueName),
 				err,
 			)
 		}
@@ -149,8 +149,8 @@ func (queue *queueStore) finalizeFailedRetry(
 
 	err := delivery.Ack(false)
 	if err != nil {
-		queue.lgr.Wrn(
-			"ошибка при подтверждении обработки сообщения после повторной попытки для "+
+		queue.lgr.Warn(
+			"error acking message after failed retry for "+
 				string(clnt.queueName),
 			err,
 		)
@@ -160,14 +160,14 @@ func (queue *queueStore) finalizeFailedRetry(
 func rejectDelivery(queue *queueStore, clnt *client, delivery amqp.Delivery, cErr error) {
 	err := delivery.Reject(false)
 	if err != nil {
-		queue.lgr.Wrn(
-			"ошибка при неподтверждении обработки сообщения в очереди "+string(clnt.queueName),
+		queue.lgr.Warn(
+			"error rejecting message in queue "+string(clnt.queueName),
 			err,
 		)
 	}
 
-	queue.lgr.Wrn(
-		"ошибка при повторной обработке сообщения в очереди "+string(clnt.queueName),
+	queue.lgr.Warn(
+		"error while retrying message in queue "+string(clnt.queueName),
 		cErr,
 	)
 }
@@ -175,14 +175,14 @@ func rejectDelivery(queue *queueStore, clnt *client, delivery amqp.Delivery, cEr
 func nackDelivery(queue *queueStore, clnt *client, delivery amqp.Delivery, cErr error) {
 	err := delivery.Nack(false, true)
 	if err != nil {
-		queue.lgr.Wrn(
-			"ошибка при неподтверждении обработки сообщения в очереди "+string(clnt.queueName),
+		queue.lgr.Warn(
+			"error nacking message in queue "+string(clnt.queueName),
 			err,
 		)
 	}
 
-	queue.lgr.Wrn(
-		"ошибка при обработке сообщения в очереди "+string(clnt.queueName)+" (без retry режима)",
+	queue.lgr.Warn(
+		"error processing message in queue "+string(clnt.queueName)+" (no retry mode)",
 		cErr,
 	)
 }
@@ -190,8 +190,8 @@ func nackDelivery(queue *queueStore, clnt *client, delivery amqp.Delivery, cErr 
 func ackDelivery(queue *queueStore, clnt *client, delivery amqp.Delivery) {
 	err := delivery.Ack(false)
 	if err != nil {
-		queue.lgr.Wrn(
-			"ошибка при подтверждении обработки сообщения в очереди "+string(clnt.queueName),
+		queue.lgr.Warn(
+			"error acking message in queue "+string(clnt.queueName),
 			err,
 		)
 	}

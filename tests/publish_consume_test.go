@@ -43,10 +43,10 @@ func TestPublishConsume_SingleMessage(t *testing.T) {
 
 	waitUntil(t, 15*time.Second, func() bool {
 		return processed.Load() == 1
-	}, "обработка одного сообщения")
+	}, "single message processed")
 
 	if got := lastBody.Load(); got != wantBody {
-		t.Fatalf("тело сообщения = %q, want %q", got, wantBody)
+		t.Fatalf("message body = %q, want %q", got, wantBody)
 	}
 }
 
@@ -89,9 +89,9 @@ func TestPublishConsume_ParallelWorkers(t *testing.T) {
 
 	waitUntil(t, 20*time.Second, func() bool {
 		return processed.Load() == total
-	}, "обработка всех сообщений параллельными воркерами")
+	}, "all messages processed by parallel workers")
 
 	if got := processed.Load(); got != total {
-		t.Fatalf("обработано %d сообщений, want %d", got, total)
+		t.Fatalf("processed %d messages, want %d", got, total)
 	}
 }

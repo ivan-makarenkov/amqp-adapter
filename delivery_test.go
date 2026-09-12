@@ -53,16 +53,16 @@ func TestHandleDelivery_RecoversPanicAndNacksWithoutRequeue(t *testing.T) {
 	}, delivery)
 
 	if !ack.nackCalled {
-		t.Fatal("ожидался Nack после panic в handler")
+		t.Fatal("expected Nack after handler panic")
 	}
 
 	if ack.requeue {
-		t.Error("Nack после panic должен быть без requeue")
+		t.Error("Nack after panic must be without requeue")
 	}
 
-	errMsgs := lgr.GetErrMessages()
+	errMsgs := lgr.GetErrorMessages()
 	if len(errMsgs) == 0 {
-		t.Error("ожидался лог ошибки о panic")
+		t.Error("expected error log about panic")
 	}
 }
 
@@ -91,10 +91,10 @@ func TestHandleDelivery_HandlerErrorWithoutPanic(t *testing.T) {
 	}, delivery)
 
 	if !ack.nackCalled {
-		t.Fatal("ожидался Nack при ошибке handler без retry")
+		t.Fatal("expected Nack on handler error without retry")
 	}
 
 	if !ack.requeue {
-		t.Error("Nack при ошибке без retry должен быть с requeue=true")
+		t.Error("Nack on error without retry must use requeue=true")
 	}
 }

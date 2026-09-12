@@ -1,24 +1,24 @@
 # amqp-adapter
 
-Go-адаптер над [amqp091-go](https://github.com/rabbitmq/amqp091-go): публикация и потребление сообщений RabbitMQ с publisher confirms, авто-reconnect и опциональным retry через delayed queue / DLX.
+Go adapter over [amqp091-go](https://github.com/rabbitmq/amqp091-go): publish and consume RabbitMQ messages with publisher confirms, auto-reconnect, and optional retry via a delayed queue / DLX.
 
 ```bash
 go get github.com/ivan-makarenkov/amqp-adapter
 ```
 
-Пакет: `amqpadapter`.
+Package: `amqpadapter`.
 
-## Возможности
+## Features
 
-- Ленивое подключение publisher’а при первом `Publish`
-- Publisher confirms (один in-flight publish на соединение)
-- Автоматическое переподключение при обрыве connection/channel
-- Consumer’ы с параллелизмом (`AddConsumerN`)
-- Retry через delay-очередь и заголовок `expired` (нужен `WithFailHandler`)
-- Проброс headers/context (`WithPublishHeadersBuilder` / `WithConsumeHeadersExtractor`)
-- Подпакет [`otel`](otel/) для correlation ID и OpenTelemetry propagation
+- Lazy publisher connect on first `Publish`
+- Publisher confirms (one in-flight publish per connection)
+- Automatic reconnect on connection/channel loss
+- Consumers with parallelism (`AddConsumerN`)
+- Retry via delay queue and `expired` header (requires `WithFailHandler`)
+- Header/context plumbing (`WithPublishHeadersBuilder` / `WithConsumeHeadersExtractor`)
+- [`otel`](otel/) subpackage for correlation ID and OpenTelemetry propagation
 
-## Быстрый старт
+## Quick start
 
 ```go
 package main
@@ -73,26 +73,26 @@ func main() {
 }
 ```
 
-## Конфигурация
+## Configuration
 
-| Поле | Смысл |
+| Field | Meaning |
 |------|--------|
 | `URL` | AMQP URL |
-| `ReconnectDelay` | Пауза между попытками dial |
-| `ReInitDelay` | Пауза между повторными init channel/queue |
-| `ResendDelay` | Пауза перед повторной публикацией после ошибки/nack |
-| `QueueParams` | Параметры по имени очереди |
+| `ReconnectDelay` | Pause between dial attempts |
+| `ReInitDelay` | Pause between channel/queue re-init attempts |
+| `ResendDelay` | Pause before republish after error/nack |
+| `QueueParams` | Per-queue parameters by name |
 
 `QueueItem`:
 
-- `Retry` — `nil` = без retry; иначе delay/DLX-топология
-- `ConsumerOnly` — только consumer, без publisher-соединения
+- `Retry` — `nil` = no retry; otherwise delay/DLX topology
+- `ConsumerOnly` — consume only, no publisher connection
 
 ## Retry
 
-При `Retry != nil` библиотека объявляет exchange’и и delay-очередь. Для повторной обработки handler должен вернуть `amqpadapter.Retry(err)`.
+When `Retry != nil`, the library declares exchanges and a delay queue. For reprocessing, the handler must return `amqpadapter.Retry(err)`.
 
-После исчерпания `MaxDuration` (заголовок `expired`) или не-retryable ошибки вызывается `WithFailHandler`, сообщение ack’ается (убирается из очереди).
+After `MaxDuration` is exhausted (`expired` header) or a non-retryable error, `WithFailHandler` is called and the message is acked (removed from the queue).
 
 ```go
 q, err := mq.New(conf,
@@ -102,35 +102,35 @@ q, err := mq.New(conf,
 	}),
 )
 
-// в handler:
-return mq.Retry(err) // отложить и повторить
-return err           // без retry: финальный fail (в retry-режиме)
+// in handler:
+return mq.Retry(err) // delay and retry
+return err           // final fail (in retry mode)
 ```
 
-`WithFailHandler` обязателен, если хотя бы у одной очереди задан `Retry`.
+`WithFailHandler` is required if at least one queue has `Retry` set.
 
-## Consumer’ы
+## Consumers
 
 ```go
-_ = q.AddConsumer(ctx, "jobs", handler)      // 1 воркер
-_ = q.AddConsumerN(ctx, "jobs", 4, handler) // 4 соединения/воркера
-_ = q.InitConsumer(ctx)                     // старт циклов чтения
+_ = q.AddConsumer(ctx, "jobs", handler)      // 1 worker
+_ = q.AddConsumerN(ctx, "jobs", 4, handler) // 4 connections/workers
+_ = q.InitConsumer(ctx)                     // start read loops
 ```
 
-`AddConsumer*` — только до `InitConsumer`. Prefetch: QoS = 1 на канал.
+`AddConsumer*` is only allowed before `InitConsumer`. Prefetch: QoS = 1 per channel.
 
 ## Shutdown
 
-`Shutdown` сначала закрывает соединения (останавливает приём), затем ждёт уже запущенные обработки (`inflight`) в пределах контекста.
+`Shutdown` closes connections first (stops intake), then waits for in-flight handlers (`inflight`) within the context deadline.
 
-## Опции
+## Options
 
-- `WithLogger` — свой логгер (иначе noop)
-- `WithFailHandler` — финальные fail в retry-режиме
-- `WithPublishHeadersBuilder` — headers из `context` при publish
-- `WithConsumeHeadersExtractor` — восстановление `context` из headers
+- `WithLogger` — custom logger (otherwise noop)
+- `WithFailHandler` — permanent failures in retry mode
+- `WithPublishHeadersBuilder` — headers from `context` on publish
+- `WithConsumeHeadersExtractor` — restore `context` from headers
 
-Пример с otel:
+Example with otel:
 
 ```go
 import "github.com/ivan-makarenkov/amqp-adapter/otel"
@@ -138,7 +138,7 @@ import "github.com/ivan-makarenkov/amqp-adapter/otel"
 cfg := otel.PropagationConfig{
 	CorrelationIDKey: "x-correlation-id",
 	TraceKeys:        []string{"traceparent", "tracestate"},
-	// GetCorrelationID / SetCorrelationID / Propagator — по необходимости
+	// GetCorrelationID / SetCorrelationID / Propagator — as needed
 }
 
 q, err := mq.New(conf,
@@ -147,10 +147,10 @@ q, err := mq.New(conf,
 )
 ```
 
-## Тесты
+## Tests
 
 ```bash
 go test ./...                  # unit
-go test -short ./...           # без интеграционных
-# functional (нужен RabbitMQ), см. tests/ и Makefile
+go test -short ./...           # skip integration
+# functional (needs RabbitMQ), see tests/ and Makefile
 ```

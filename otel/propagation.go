@@ -1,5 +1,5 @@
-// Package otel предоставляет готовые PublishHeadersBuilder и ConsumeHeadersExtractor
-// для propagation correlation ID и OpenTelemetry trace context через AMQP headers.
+// Package otel provides ready-made PublishHeadersBuilder and ConsumeHeadersExtractor
+// helpers for correlation ID and OpenTelemetry trace context propagation via AMQP headers.
 package otel
 
 import (
@@ -9,7 +9,7 @@ import (
 	"go.opentelemetry.io/otel/propagation"
 )
 
-// PropagationConfig задаёт ключи headers для correlation и trace context.
+// PropagationConfig configures header keys for correlation and trace context.
 type PropagationConfig struct {
 	CorrelationIDKey string
 	TraceKeys        []string
@@ -18,7 +18,7 @@ type PropagationConfig struct {
 	Propagator       propagation.TextMapPropagator
 }
 
-// NewPublishHeadersBuilder создаёт builder для записи correlation и trace headers при публикации.
+// NewPublishHeadersBuilder creates a builder that writes correlation and trace headers on publish.
 func NewPublishHeadersBuilder(cfg PropagationConfig) amqpadapter.PublishHeadersBuilder {
 	propagator := cfg.Propagator
 	if propagator == nil {
@@ -48,7 +48,7 @@ func NewPublishHeadersBuilder(cfg PropagationConfig) amqpadapter.PublishHeadersB
 	}
 }
 
-// NewConsumeHeadersExtractor создаёт extractor для восстановления context из AMQP headers.
+// NewConsumeHeadersExtractor creates an extractor that restores context from AMQP headers.
 func NewConsumeHeadersExtractor(cfg PropagationConfig) amqpadapter.ConsumeHeadersExtractor {
 	propagator := cfg.Propagator
 	if propagator == nil {

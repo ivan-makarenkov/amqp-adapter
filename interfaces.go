@@ -5,32 +5,28 @@ import (
 	"time"
 )
 
-// QueueName — типизированное имя очереди RabbitMQ.
+// QueueName is a typed RabbitMQ queue name.
 type QueueName string
 
-// Logger предоставляет унифицированный интерфейс для логирования сообщений
-// с разными уровнями важности (от отладочных до фатальных),
-// а также поддержку добавления мета- и контекстной информации.
+// Logger is a minimal logging interface with slog-style method names.
 type Logger interface {
-	Inf(msg string, args ...any)
-	Wrn(msg string, args ...any)
-	Dbg(msg string, args ...any)
-	Err(msg string, args ...any)
-	Ftl(msg string, args ...any)
-	InfCtx(ctx context.Context, msg string, args ...any)
-	WrnCtx(ctx context.Context, msg string, args ...any)
-	DbgCtx(ctx context.Context, msg string, args ...any)
-	ErrCtx(ctx context.Context, msg string, args ...any)
-	FtlCtx(ctx context.Context, msg string, args ...any)
+	Debug(msg string, args ...any)
+	Info(msg string, args ...any)
+	Warn(msg string, args ...any)
+	Error(msg string, args ...any)
+	DebugContext(ctx context.Context, msg string, args ...any)
+	InfoContext(ctx context.Context, msg string, args ...any)
+	WarnContext(ctx context.Context, msg string, args ...any)
+	ErrorContext(ctx context.Context, msg string, args ...any)
 }
 
-// PublishMessagePriority приоритет сообщения в RabbitMQ.
+// PublishMessagePriority is the RabbitMQ message priority (0–9).
 type PublishMessagePriority uint8
 
-// DefaultContentType тип содержимого по умолчанию для публикуемых сообщений.
+// DefaultContentType is the default content type for published messages.
 const DefaultContentType = "text/plain"
 
-// PublishMessage описывает тело и опции публикуемого сообщения.
+// PublishMessage describes the body and options of a published message.
 type PublishMessage struct {
 	Body             []byte
 	ContentType      string
@@ -38,19 +34,19 @@ type PublishMessage struct {
 	Priority         *PublishMessagePriority
 }
 
-// PublishHeadersBuilder формирует AMQP headers при публикации из context.
+// PublishHeadersBuilder builds AMQP headers from context at publish time.
 type PublishHeadersBuilder func(ctx context.Context) map[string]any
 
-// ConsumeHeadersExtractor восстанавливает context из AMQP headers при потреблении.
-// parent — контекст consumer loop (из InitConsumer); возвращённый контекст должен быть его потомком.
+// ConsumeHeadersExtractor restores context from AMQP headers on consume.
+// parent is the consumer-loop context (from InitConsumer); the returned context
+// must be derived from it.
 type ConsumeHeadersExtractor func(parent context.Context, headers map[string]any) context.Context
 
-// ConsumerHandler обрабатывает тело сообщения.
-// Для повторной обработки верните mq.Retry(err).
+// ConsumerHandler processes a message body.
+// Return mq.Retry(err) to request delayed reprocessing.
 type ConsumerHandler func(ctx context.Context, data []byte) error
 
-// Queue определяет контракт для работы с RabbitMQ:
-// публикация, регистрация обработчиков, инициализация потребителей и корректное завершение работы.
+// Queue is the public contract for publish, consume registration, and shutdown.
 type Queue interface {
 	Publish(ctx context.Context, queue QueueName, msg PublishMessage) error
 	AddConsumer(ctx context.Context, queue QueueName, handler ConsumerHandler) error

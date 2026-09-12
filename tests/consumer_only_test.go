@@ -74,5 +74,5 @@ func TestConsumerOnly_ConsumeWithoutPublish(t *testing.T) {
 
 	waitUntil(t, 15*time.Second, func() bool {
 		return processed.Load() == 1
-	}, "обработка сообщения в ConsumerOnly очереди")
+	}, "message processed on ConsumerOnly queue")
 }

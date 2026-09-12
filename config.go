@@ -2,7 +2,7 @@ package amqpadapter
 
 import "time"
 
-// Config содержит настройки подключения к RabbitMQ и параметры очередей.
+// Config holds RabbitMQ connection settings and per-queue parameters.
 type Config struct {
 	URL            string
 	ReconnectDelay time.Duration
@@ -11,16 +11,16 @@ type Config struct {
 	QueueParams    map[QueueName]QueueItem
 }
 
-// RetryConfig описывает параметры retry-механизма для очереди.
+// RetryConfig describes retry parameters for a queue.
 type RetryConfig struct {
 	Delay       time.Duration
 	MaxDuration time.Duration
 }
 
-// QueueItem описывает параметры обработки для отдельной очереди.
+// QueueItem describes processing options for a single queue.
 type QueueItem struct {
-	// Retry включает retry-режим; nil — без retry.
+	// Retry enables retry mode; nil means no retry.
 	Retry *RetryConfig
-	// ConsumerOnly — только потребление, без publisher-соединения.
+	// ConsumerOnly means consume-only (no publisher connection).
 	ConsumerOnly bool
 }

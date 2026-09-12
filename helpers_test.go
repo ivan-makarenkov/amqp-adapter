@@ -19,15 +19,15 @@ func requireRabbitMQ(t *testing.T) *amqp.Connection {
 	}
 
 	if os.Getenv("MQ_REQUIRE_INTEGRATION") == "1" {
-		t.Fatalf("RabbitMQ недоступен: %v", err)
+		t.Fatalf("RabbitMQ unavailable: %v", err)
 	}
 
-	t.Skipf("пропуск теста: не удалось подключиться к RabbitMQ: %v", err)
+	t.Skipf("skipping test: failed to connect to RabbitMQ: %v", err)
 	return nil
 }
 
 func TestDateFormat(t *testing.T) {
-	t.Run("RFC3339 формат", func(t *testing.T) {
+	t.Run("RFC3339 format", func(t *testing.T) {
 		nowUTC := time.Now().UTC()
 		formatted := nowUTC.Format(time.RFC3339)
 
@@ -41,11 +41,11 @@ func TestDateFormat(t *testing.T) {
 			diff = -diff
 		}
 		if diff > time.Second {
-			t.Errorf("разница во времени UTC = %v, want < 1s", diff)
+			t.Errorf("UTC time diff = %v, want < 1s", diff)
 		}
 	})
 
-	t.Run("legacy формат обратная совместимость", func(t *testing.T) {
+	t.Run("legacy format backwards compatibility", func(t *testing.T) {
 		legacy := "2030-01-01 00:00:00"
 
 		parsed, err := parseExpiredTime(legacy)
@@ -54,13 +54,13 @@ func TestDateFormat(t *testing.T) {
 		}
 
 		if parsed.Year() != 2030 {
-			t.Errorf("год = %d, want 2030", parsed.Year())
+			t.Errorf("year = %d, want 2030", parsed.Year())
 		}
 	})
 }
 
 func TestPublishMessagePriority(t *testing.T) {
-	t.Run("валидный приоритет", func(t *testing.T) {
+	t.Run("valid priority", func(t *testing.T) {
 		priority := PublishMessagePriority(9)
 		if priority != 9 {
 			t.Errorf("PublishMessagePriority = %v, want 9", priority)
@@ -68,11 +68,11 @@ func TestPublishMessagePriority(t *testing.T) {
 	})
 }
 
-// TestInitQueue_Integration интеграционный тест для initQueue.
-// Требует запущенного RabbitMQ на localhost:5672.
+// TestInitQueue_Integration is an integration test for initQueue.
+// Requires RabbitMQ on localhost:5672.
 func TestInitQueue_Integration(t *testing.T) {
 	if testing.Short() {
-		t.Skip("пропуск интеграционного теста в коротком режиме")
+		t.Skip("skipping integration test in short mode")
 	}
 
 	conn := requireRabbitMQ(t)
@@ -80,7 +80,7 @@ func TestInitQueue_Integration(t *testing.T) {
 
 	channel, err := conn.Channel()
 	if err != nil {
-		t.Fatalf("не удалось создать канал: %v", err)
+		t.Fatalf("failed to create channel: %v", err)
 	}
 	defer channel.Close()
 
@@ -96,15 +96,15 @@ func TestInitQueue_Integration(t *testing.T) {
 
 	_, err = channel.QueueDelete(queueName, false, false, false)
 	if err != nil {
-		t.Logf("не удалось удалить очередь: %v", err)
+		t.Logf("failed to delete queue: %v", err)
 	}
 }
 
-// TestInitQueueWithRetry_Integration интеграционный тест для initQueueWithRetry.
-// Требует запущенного RabbitMQ на localhost:5672.
+// TestInitQueueWithRetry_Integration is an integration test for initQueueWithRetry.
+// Requires RabbitMQ on localhost:5672.
 func TestInitQueueWithRetry_Integration(t *testing.T) {
 	if testing.Short() {
-		t.Skip("пропуск интеграционного теста в коротком режиме")
+		t.Skip("skipping integration test in short mode")
 	}
 
 	conn := requireRabbitMQ(t)
@@ -112,7 +112,7 @@ func TestInitQueueWithRetry_Integration(t *testing.T) {
 
 	channel, err := conn.Channel()
 	if err != nil {
-		t.Fatalf("не удалось создать канал: %v", err)
+		t.Fatalf("failed to create channel: %v", err)
 	}
 	defer channel.Close()
 
@@ -130,10 +130,10 @@ func TestInitQueueWithRetry_Integration(t *testing.T) {
 
 	_, err = channel.QueueDelete(queueName, false, false, false)
 	if err != nil {
-		t.Logf("не удалось удалить очередь: %v", err)
+		t.Logf("failed to delete queue: %v", err)
 	}
 	_, err = channel.QueueDelete(queueName+".delay", false, false, false)
 	if err != nil {
-		t.Logf("не удалось удалить очередь delay: %v", err)
+		t.Logf("failed to delete delay queue: %v", err)
 	}
 }
